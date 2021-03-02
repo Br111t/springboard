@@ -77,13 +77,14 @@ LIMIT 0, 30;
 /* Q6: You'd like to get the first and last name of the last member(s)
 who signed up. Try not to use the LIMIT clause for your solution. */
 
-SELECT LAST(`firstname`, `surname`) 
-FROM `Members`;
-/*********************************
-Receive the following error: 
-1064 - You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 
-'(`firstname`, `surname`) FROM `Members` LIMIT 0, 30' at line 1
-*********************************/
+SELECT `firstname` , `surname` , `joindate`
+FROM `Members`
+WHERE `joindate` = (
+
+SELECT MAX( `joindate` )
+FROM `Members`
+)
+
 
 /* Q7: Produce a list of all members who have used a tennis court.
 Include in your output the name of the court, and the name of the member
@@ -109,9 +110,6 @@ IN ( 0, 1 )
 ORDER BY memname
 LIMIT 0 , 30
 
-/*********************************************************
-Having trouble joining these three tables 
-**********************************************/
 
 /* Q8: Produce a list of bookings on the day of 2012-09-14 which
 will cost the member (or guest) more than $30. Remember that guests have
@@ -120,8 +118,35 @@ the guest user's ID is always 0. Include in your output the name of the
 facility, the name of the member formatted as a single column, and the cost.
 Order by descending cost, and do not use any subqueries. */
 
+--facility name, members name concatonated, cost 
+--starttime on 2012-09-14
+--facilities membercost guestcost by facid
+--booking slots
+SELECT DISTINCT f.`name` , CONCAT( m.`firstname` , " ", m.`surname` ) AS memname,
+	CASE WHEN b.`memid` =0
+		THEN f.`guestcost` * b.`slots`
+	ELSE f.`membercost` * b.`slots`
+		END AS cost
+FROM `Members` AS m, `Facilities` AS f, `Bookings` AS b
+WHERE f.`facid` = b.`facid`
+AND m.`memid` = b.`memid`
+AND b.`starttime` LIKE '2012-09-14%'
+HAVING cost >30
+ORDER BY cost DESC
 
 /* Q9: This time, produce the same result as in Q8, but using a subquery. */
+
+SELECT DISTINCT f.`name` , CONCAT( m.`firstname` , " ", m.`surname` ) AS memname,
+	CASE WHEN b.`memid` =0
+		THEN f.`guestcost` * b.`slots`
+	ELSE f.`membercost` * b.`slots`
+		END AS cost
+FROM `Members` AS m, `Facilities` AS f, `Bookings` AS b
+WHERE (f.`facid` = b.`facid`
+AND m.`memid` = b.`memid`
+AND b.`starttime` LIKE '2012-09-14%')
+HAVING cost >30
+ORDER BY cost DESC
 
 
 /* PART 2: SQLite
@@ -133,12 +158,46 @@ QUESTIONS:
 /* Q10: Produce a list of facilities with a total revenue less than 1000.
 The output of facility name and total revenue, sorted by revenue. Remember
 that there's a different cost for guests and members! */
+--facility name, total revenue, 
+
+SELECT DISTINCT f.`name` ,
+	CASE WHEN b.`memid` =0
+		THEN f.`guestcost` * b.`slots`
+	ELSE f.`membercost` * b.`slots`
+		END AS total_revenue
+FROM `Members` AS m, `Facilities` AS f, `Bookings` AS b
+WHERE f.`facid` = b.`facid`
+	AND m.`memid` = b.`memid`
+HAVING total_revenue <1000
+ORDER BY total_revenue DESC
+LIMIT 0 , 30
+
 
 /* Q11: Produce a report of members and who recommended them in alphabetic surname,firstname order */
+SELECT m.`memid` , CONCAT( m.`firstname` , " ", m.`surname` ) AS member, m.`recommendedby`, 
+	CASE WHEN m.`recommendedby` = 0 THEN "notRecommended"
+	ELSE CONCAT( r.`firstname` , " ", r.`surname` ) END AS rMember
+FROM `Members` AS m
+JOIN `Members` AS r ON r.`memid` = m.`recommendedby`
+LIMIT 0 , 30
+
 
 
 /* Q12: Find the facilities with their usage by member, but not guests */
+SELECT DISTINCT f.`name` AS Facility, b.`memid`, COUNT( b.`memid` ) AS useCount
+FROM `Facilities` AS f, `Bookings` AS b
+WHERE f.`facid` = b.`facid`
+AND b.`memid` >0
+GROUP BY b.`memid`
+ORDER BY Facility, b.`memid`
+LIMIT 0 , 30
 
 
 /* Q13: Find the facilities usage by month, but not guests */
 
+SELECT DISTINCT f.`name` AS Facility , MONTH( `starttime` ) AS month , COUNT( * ) AS useByMonth
+FROM `Bookings` AS b, `Facilities` AS f
+WHERE YEAR( `starttime` ) = '2012'
+AND b.`memid` >0
+GROUP BY facility, month
+LIMIT 0 , 30
